@@ -1,0 +1,104 @@
+# Dependencies
+node_modules/
+*/node_modules/
+**/node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment Variables (CRITICAL - Contains Secrets!)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
+!.env.example
+!.env.docker
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+backend/logs/
+frontend/logs/
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Build Output
+dist/
+dist-ssr/
+build/
+*.local
+
+# Docker
+.dockerignore
+
+# Blockchain Data (Contains User Data!)
+backend/blockchain-data/
+blockchain-data/
+*.blockchain
+chain.json
+
+# Database Dumps
+*.dump
+*.sql
+*.sqlite
+*.db
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+.project
+.classpath
+.settings/
+
+# Temporary Files
+tmp/
+temp/
+*.tmp
+*.bak
+*.cache
+
+# Private Keys & Certificates (CRITICAL!)
+*.pem
+*.key
+*.cert
+*.csr
+*.p12
+*.pfx
+private/
+secrets/
+
+# MongoDB Data
+data/
+mongodb_data/
+
+# Docker Volumes
+.docker/
+docker-compose.override.yml
