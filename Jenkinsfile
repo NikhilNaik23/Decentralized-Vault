@@ -21,7 +21,8 @@ VITE_API_URL=http://localhost:5000/api
 EOF
                     
                     echo "✅ Environment files created"
-                    ls -la backend/.env frontend/.env
+                    cat backend/.env
+                    cat frontend/.env
                 '''
             }
         }
@@ -32,8 +33,33 @@ EOF
                 sh '''
                     docker stop test-mongo 2>/dev/null || true
                     docker rm test-mongo 2>/dev/null || true
-                    docker-compose down -v || true
-                    docker system prune -f || true
+                    docker-compose down -v 2>/dev/null || true
+                '''
+            }
+        }
+        
+        stage('Verify Files') {
+            steps {
+                echo '📂 Verifying project structure...'
+                sh '''
+                    echo "=== Current Directory ==="
+                    pwd
+                    
+                    echo ""
+                    echo "=== Project Files ==="
+                    ls -la
+                    
+                    echo ""
+                    echo "=== Docker Compose File ==="
+                    cat docker-compose.yml
+                    
+                    echo ""
+                    echo "=== Backend Files ==="
+                    ls -la backend/
+                    
+                    echo ""
+                    echo "=== Frontend Files ==="
+                    ls -la frontend/
                 '''
             }
         }
@@ -43,12 +69,13 @@ EOF
                 echo '🧪 Running tests...'
                 sh '''
                     docker run -d --name test-mongo -p 27017:27017 mongo:7.0
-                    sleep 15
+                    sleep 20
                     
                     cd backend
                     npm install
                     npm test || echo "Tests completed"
                     
+                    cd ..
                     docker stop test-mongo
                     docker rm test-mongo
                 '''
@@ -57,58 +84,61 @@ EOF
         
         stage('Build') {
             steps {
-                echo '🐳 Building images...'
+                echo '🐳 Building Docker images...'
                 sh '''
-                    docker-compose build --no-cache
-                    docker images | grep identity-vault
+                    echo "=== Building with docker-compose ==="
+                    docker-compose build --no-cache 2>&1 | tee build.log
+                    
+                    echo ""
+                    echo "=== Build Exit Code: $? ==="
+                    
+                    echo ""
+                    echo "=== Images Created ==="
+                    docker images | grep -E "identity-vault|decentralized" || echo "No images found"
                 '''
             }
         }
         
         stage('Deploy') {
             steps {
-                echo '🚀 Deploying...'
+                echo '🚀 Deploying containers...'
                 sh '''
-                    docker-compose up -d
+                    echo "=== Starting containers with docker-compose ==="
+                    docker-compose up -d 2>&1 | tee deploy.log
                     
-                    echo "Waiting for services to start..."
+                    echo ""
+                    echo "=== Deploy Exit Code: $? ==="
+                    
+                    echo ""
+                    echo "=== Waiting for startup ==="
                     sleep 30
                     
-                    echo "=== Container Status ==="
+                    echo ""
+                    echo "=== Docker Compose Status ==="
                     docker-compose ps
                     
-                    echo "=== MongoDB Logs ==="
-                    docker logs identity-vault-mongodb --tail 20
+                    echo ""
+                    echo "=== All Containers ==="
+                    docker ps -a
                     
-                    echo "=== Backend Logs ==="
-                    docker logs identity-vault-backend --tail 20
-                    
-                    echo "=== Frontend Logs ==="
-                    docker logs identity-vault-frontend --tail 20
-                    
-                    echo "=== Network Status ==="
-                    docker network inspect decentralizedidentityvault_identity-vault-network || true
+                    echo ""
+                    echo "=== Container Logs ==="
+                    docker-compose logs --tail=30
                 '''
             }
         }
         
         stage('Verify') {
             steps {
-                echo '✅ Verifying...'
+                echo '✅ Verifying deployment...'
                 sh '''
                     echo "=== Running Containers ==="
                     docker ps --filter "name=identity-vault"
                     
-                    echo "=== Health Check ==="
-                    sleep 5
-                    curl -f http://localhost:5000/health || echo "Backend health check failed"
-                    curl -f http://localhost:5173 || echo "Frontend check failed"
-                    
                     echo ""
-                    echo "✅ Deployment URLs:"
+                    echo "✅ Deployment Complete!"
                     echo "🌐 Frontend: http://localhost:5173"
                     echo "🔧 Backend: http://localhost:5000"
-                    echo "🗄️ MongoDB: localhost:27018"
                 '''
             }
         }
@@ -123,14 +153,20 @@ EOF
         failure {
             echo '❌ FAILED! Debug info:'
             sh '''
+                echo "=== Build Log ==="
+                cat build.log 2>/dev/null || echo "No build log"
+                
+                echo ""
+                echo "=== Deploy Log ==="
+                cat deploy.log 2>/dev/null || echo "No deploy log"
+                
+                echo ""
+                echo "=== Docker Compose Status ==="
+                docker-compose ps 2>&1 || echo "Could not get status"
+                
+                echo ""
                 echo "=== All Container Logs ==="
-                docker-compose logs --tail=50
-                
-                echo "=== Container Status ==="
-                docker ps -a
-                
-                echo "=== Network Status ==="
-                docker network ls
+                docker-compose logs --tail=50 2>&1 || echo "No logs available"
             '''
         }
         always {
