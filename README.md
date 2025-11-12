@@ -473,10 +473,6 @@ docker-compose up
 
 This project is licensed under the MIT License.
 
-## 👥 Authors
-
-- Your Name - Initial work
-
 ## 🙏 Acknowledgments
 
 - W3C DID Specification
@@ -484,12 +480,6 @@ This project is licensed under the MIT License.
 - OAuth 2.0 Framework
 - Ethereum Community
 - Open Source Community
-
-## 📞 Support
-
-For issues and questions:
-- Open an issue on GitHub
-- Email: your-email@example.com
 
 ## 🔗 Related Projects
 
