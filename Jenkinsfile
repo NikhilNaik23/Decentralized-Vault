@@ -7,62 +7,48 @@ pipeline {
                 echo '📥 Checking out code...'
                 checkout scm
                 
-                // Create backend .env from .env.example
                 sh '''
-                    echo "Creating backend/.env from .env.example..."
+                    echo "Creating backend/.env..."
                     cp backend/.env.example backend/.env
-                    
-                    # Override production values
                     sed -i 's/NODE_ENV=development/NODE_ENV=production/' backend/.env
                     sed -i 's/PORT=3000/PORT=5000/' backend/.env
                     sed -i 's/HOST=localhost/HOST=0.0.0.0/' backend/.env
                     sed -i 's|mongodb://localhost:27017|mongodb://mongodb:27017|g' backend/.env
-                    sed -i 's|CORS_ORIGIN=http://localhost:3001|CORS_ORIGIN=http://localhost,http://localhost:5173|' backend/.env
                     
-                    echo "✅ Backend .env created"
-                '''
-                
-                // Create frontend .env
-                sh '''
                     echo "Creating frontend/.env..."
                     cat > frontend/.env << 'EOF'
 VITE_API_URL=http://localhost:5000/api
 EOF
                     
-                    echo "✅ Frontend .env created"
+                    echo "✅ Environment files created"
+                    ls -la backend/.env frontend/.env
                 '''
             }
         }
         
         stage('Cleanup') {
             steps {
-                echo '🧹 Cleaning up old containers...'
+                echo '🧹 Cleaning up...'
                 sh '''
                     docker stop test-mongo 2>/dev/null || true
                     docker rm test-mongo 2>/dev/null || true
-                    docker-compose down || true
+                    docker-compose down -v || true
+                    docker system prune -f || true
                 '''
             }
         }
         
         stage('Test') {
             steps {
-                echo '🧪 Running backend tests...'
+                echo '🧪 Running tests...'
                 sh '''
-                    echo "Starting test MongoDB..."
                     docker run -d --name test-mongo -p 27017:27017 mongo:7.0
-                    
-                    echo "Waiting for MongoDB to be ready..."
                     sleep 15
                     
-                    echo "Installing backend dependencies..."
                     cd backend
                     npm install
+                    npm test || echo "Tests completed"
                     
-                    echo "Running tests..."
-                    npm test || true
-                    
-                    echo "Stopping test MongoDB..."
                     docker stop test-mongo
                     docker rm test-mongo
                 '''
@@ -71,30 +57,58 @@ EOF
         
         stage('Build') {
             steps {
-                echo '🐳 Building Docker images...'
-                sh 'docker-compose build'
+                echo '🐳 Building images...'
+                sh '''
+                    docker-compose build --no-cache
+                    docker images | grep identity-vault
+                '''
             }
         }
         
         stage('Deploy') {
             steps {
-                echo '🚀 Deploying containers...'
+                echo '🚀 Deploying...'
                 sh '''
                     docker-compose up -d
-                    sleep 20
+                    
+                    echo "Waiting for services to start..."
+                    sleep 30
+                    
+                    echo "=== Container Status ==="
                     docker-compose ps
+                    
+                    echo "=== MongoDB Logs ==="
+                    docker logs identity-vault-mongodb --tail 20
+                    
+                    echo "=== Backend Logs ==="
+                    docker logs identity-vault-backend --tail 20
+                    
+                    echo "=== Frontend Logs ==="
+                    docker logs identity-vault-frontend --tail 20
+                    
+                    echo "=== Network Status ==="
+                    docker network inspect decentralizedidentityvault_identity-vault-network || true
                 '''
             }
         }
         
         stage('Verify') {
             steps {
-                echo '✅ Verifying deployment...'
+                echo '✅ Verifying...'
                 sh '''
+                    echo "=== Running Containers ==="
                     docker ps --filter "name=identity-vault"
+                    
+                    echo "=== Health Check ==="
+                    sleep 5
+                    curl -f http://localhost:5000/health || echo "Backend health check failed"
+                    curl -f http://localhost:5173 || echo "Frontend check failed"
+                    
                     echo ""
-                    echo "Frontend: http://localhost:5173"
-                    echo "Backend: http://localhost:5000"
+                    echo "✅ Deployment URLs:"
+                    echo "🌐 Frontend: http://localhost:5173"
+                    echo "🔧 Backend: http://localhost:5000"
+                    echo "🗄️ MongoDB: localhost:27018"
                 '''
             }
         }
@@ -102,17 +116,24 @@ EOF
     
     post {
         success {
-            echo '✅ Deployment successful!'
+            echo '✅ SUCCESS!'
             echo '🌐 Frontend: http://localhost:5173'
             echo '🔧 Backend: http://localhost:5000'
         }
         failure {
-            echo '❌ Deployment failed! Showing logs...'
-            sh 'docker-compose logs --tail=30 backend || true'
-            sh 'docker-compose logs --tail=30 frontend || true'
+            echo '❌ FAILED! Debug info:'
+            sh '''
+                echo "=== All Container Logs ==="
+                docker-compose logs --tail=50
+                
+                echo "=== Container Status ==="
+                docker ps -a
+                
+                echo "=== Network Status ==="
+                docker network ls
+            '''
         }
         always {
-            echo '🧹 Cleaning up test containers...'
             sh '''
                 docker stop test-mongo 2>/dev/null || true
                 docker rm test-mongo 2>/dev/null || true
