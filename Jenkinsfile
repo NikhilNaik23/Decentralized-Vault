@@ -12,10 +12,10 @@ pipeline {
         stage('Cleanup') {
             steps {
                 echo '🧹 Cleaning up old containers...'
-                bat '''
-                    docker stop test-mongo 2>nul || exit 0
-                    docker rm test-mongo 2>nul || exit 0
-                    docker-compose down || exit 0
+                sh '''
+                    docker stop test-mongo 2>/dev/null || true
+                    docker rm test-mongo 2>/dev/null || true
+                    docker-compose down || true
                 '''
             }
         }
@@ -23,21 +23,21 @@ pipeline {
         stage('Test') {
             steps {
                 echo '🧪 Running backend tests...'
-                bat '''
-                    echo Starting test MongoDB...
+                sh '''
+                    echo "Starting test MongoDB..."
                     docker run -d --name test-mongo -p 27017:27017 mongo:7.0
                     
-                    echo Waiting for MongoDB to be ready...
-                    timeout /t 15 /nobreak
+                    echo "Waiting for MongoDB to be ready..."
+                    sleep 15
                     
-                    echo Installing backend dependencies...
+                    echo "Installing backend dependencies..."
                     cd backend
-                    call npm install
+                    npm install
                     
-                    echo Running tests...
-                    call npm test || exit 0
+                    echo "Running tests..."
+                    npm test || true
                     
-                    echo Stopping test MongoDB...
+                    echo "Stopping test MongoDB..."
                     docker stop test-mongo
                     docker rm test-mongo
                 '''
@@ -47,16 +47,16 @@ pipeline {
         stage('Build') {
             steps {
                 echo '🐳 Building Docker images...'
-                bat 'docker-compose build'
+                sh 'docker-compose build'
             }
         }
         
         stage('Deploy') {
             steps {
                 echo '🚀 Deploying containers...'
-                bat '''
+                sh '''
                     docker-compose up -d
-                    timeout /t 20 /nobreak
+                    sleep 20
                     docker-compose ps
                 '''
             }
@@ -65,11 +65,11 @@ pipeline {
         stage('Verify') {
             steps {
                 echo '✅ Verifying deployment...'
-                bat '''
+                sh '''
                     docker ps --filter "name=decentralized"
-                    echo.
-                    echo Frontend should be at: http://localhost
-                    echo Backend should be at: http://localhost:5000
+                    echo ""
+                    echo "Frontend should be at: http://localhost"
+                    echo "Backend should be at: http://localhost:5000"
                 '''
             }
         }
@@ -83,14 +83,14 @@ pipeline {
         }
         failure {
             echo '❌ Deployment failed! Showing logs...'
-            bat 'docker-compose logs --tail=30 backend'
-            bat 'docker-compose logs --tail=30 frontend'
+            sh 'docker-compose logs --tail=30 backend || true'
+            sh 'docker-compose logs --tail=30 frontend || true'
         }
         always {
             echo '🧹 Cleaning up test containers...'
-            bat '''
-                docker stop test-mongo 2>nul || exit 0
-                docker rm test-mongo 2>nul || exit 0
+            sh '''
+                docker stop test-mongo 2>/dev/null || true
+                docker rm test-mongo 2>/dev/null || true
             '''
         }
     }
