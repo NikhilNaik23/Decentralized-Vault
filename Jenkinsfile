@@ -6,6 +6,31 @@ pipeline {
             steps {
                 echo '📥 Checking out code...'
                 checkout scm
+                
+                // Create backend .env from .env.example
+                sh '''
+                    echo "Creating backend/.env from .env.example..."
+                    cp backend/.env.example backend/.env
+                    
+                    # Override production values
+                    sed -i 's/NODE_ENV=development/NODE_ENV=production/' backend/.env
+                    sed -i 's/PORT=3000/PORT=5000/' backend/.env
+                    sed -i 's/HOST=localhost/HOST=0.0.0.0/' backend/.env
+                    sed -i 's|mongodb://localhost:27017|mongodb://mongodb:27017|g' backend/.env
+                    sed -i 's|CORS_ORIGIN=http://localhost:3001|CORS_ORIGIN=http://localhost,http://localhost:5173|' backend/.env
+                    
+                    echo "✅ Backend .env created"
+                '''
+                
+                // Create frontend .env
+                sh '''
+                    echo "Creating frontend/.env..."
+                    cat > frontend/.env << 'EOF'
+VITE_API_URL=http://localhost:5000/api
+EOF
+                    
+                    echo "✅ Frontend .env created"
+                '''
             }
         }
         
@@ -66,10 +91,10 @@ pipeline {
             steps {
                 echo '✅ Verifying deployment...'
                 sh '''
-                    docker ps --filter "name=decentralized"
+                    docker ps --filter "name=identity-vault"
                     echo ""
-                    echo "Frontend should be at: http://localhost"
-                    echo "Backend should be at: http://localhost:5000"
+                    echo "Frontend: http://localhost:5173"
+                    echo "Backend: http://localhost:5000"
                 '''
             }
         }
@@ -78,7 +103,7 @@ pipeline {
     post {
         success {
             echo '✅ Deployment successful!'
-            echo '🌐 Frontend: http://localhost'
+            echo '🌐 Frontend: http://localhost:5173'
             echo '🔧 Backend: http://localhost:5000'
         }
         failure {
