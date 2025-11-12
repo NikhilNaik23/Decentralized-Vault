@@ -10,12 +10,12 @@ pipeline {
         
         stage('Test') {
             steps {
-                sh '''
+                bat '''
                     docker run -d --name test-mongo -p 27017:27017 mongo:7.0
-                    sleep 10
+                    timeout /t 10 /nobreak
                     cd backend
                     npm install
-                    npm test || true
+                    npm test || exit 0
                     docker stop test-mongo
                     docker rm test-mongo
                 '''
@@ -24,7 +24,7 @@ pipeline {
         
         stage('Build & Deploy') {
             steps {
-                sh '''
+                bat '''
                     docker-compose down
                     docker-compose build
                     docker-compose up -d
@@ -41,8 +41,8 @@ pipeline {
             echo '❌ Deployment failed!'
         }
         always {
-            sh 'docker stop test-mongo 2>/dev/null || true'
-            sh 'docker rm test-mongo 2>/dev/null || true'
+            bat 'docker stop test-mongo 2>nul || exit 0'
+            bat 'docker rm test-mongo 2>nul || exit 0'
         }
     }
 }
